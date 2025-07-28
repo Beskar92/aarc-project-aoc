@@ -2,96 +2,102 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>KUS-Dossier: MAB-EX-Ω (Prototyp)</title>
+  <title>KUS-Dossier: MAB-EX-Ω Prototyp</title>
   <style>
     body {
-      margin: 0;
       background-color: black;
-      font-family: monospace;
-      color: cyan;
+      margin: 0;
+      padding: 0;
+      font-family: 'Courier New', monospace;
+      color: #00ffff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
     }
 
     .datapad {
-      background-image: url("aarc.png");
-      background-size: contain;
+      position: relative;
+      width: 700px;
+      height: 1000px;
+      background-image: url('aarc.png');
+      background-size: cover;
       background-repeat: no-repeat;
       background-position: center;
-      width: 768px;
-      height: 1215px;
-      margin: 20px auto;
-      position: relative;
       overflow: hidden;
+      box-shadow: 0 0 40px #00ffff66;
     }
 
-    .text-container {
+    .screen {
       position: absolute;
-      top: 85px;
-      left: 55px;
-      right: 55px;
-      bottom: 80px;
+      top: 75px;
+      left: 40px;
+      right: 40px;
+      bottom: 75px;
+      background: linear-gradient(to bottom, #002c2c, #003f3f);
+      padding: 20px;
       overflow-y: auto;
-      padding-right: 10px;
+      box-sizing: border-box;
+      border-radius: 8px;
     }
 
-    h1, h2 {
-      color: cyan;
-      font-weight: bold;
+    h1, h2, h3 {
+      color: #00ffff;
     }
 
     ul {
-      padding-left: 20px;
+      margin-top: 0;
     }
 
-    ::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background-color: cyan;
-      border-radius: 10px;
-    }
-
-    ::-webkit-scrollbar-track {
-      background-color: #003333;
+    strong {
+      color: #00ffcc;
     }
   </style>
 </head>
 <body>
   <div class="datapad">
-    <div class="text-container">
-      <h1>KUS-DOSSIER: ORBITALPLATTFORM MAB-EX-Ω (PROTOTYP)</h1>
+    <div class="screen">
+      <h1>KUS-Dossier: Orbitalplattform MAB-EX-Ω (Prototyp)</h1>
 
       <h2>1. Einleitung</h2>
       <p>
-        Im Rahmen des Programms zur orbitalen Abschirmung und schwerpunktbasierten Flottenabwehr
-        wurde durch das Kommando für strategische Rüstungsprojekte die erste Testplattform eines massereaktiven
-        Schildbrechergeschützes unter orbitalem Schutzfeld entwickelt.
+        Im Rahmen des Programms zur orbitalen Abschirmung und schwerpunktbasierten Flottenabwehr wurde durch das Kommando für strategische Rüstungsprojekte die erste Testplattform eines massereaktiven Schildbrechergeschützes unter orbitalem Schutzfeld entwickelt.
       </p>
       <p>
-        Ziel des Prototyps ist die Erprobung der kombinierten Verwendung eines MAB-EX-Ω-Kanonenmoduls mit externer
-        planetarer Schildprojektion, unter realistischen Feuerbedingungen.
+        Ziel des Prototyps ist die Erprobung der kombinierten Verwendung eines MAB-EX-Ω-Kanonemoduls mit externer planetarer Schildprojektion, unter realistischen Feuerbedingungen.
       </p>
 
       <h2>2. Aufbau der Testeinheit</h2>
       <ul>
-        <li>Plattformkörper: Stabilisierte Orbitalstation mit Zentralträger und Energiekern</li>
-        <li>Primärwaffe: MAB-EX-Ω | 12 Schuss/Min. | Kaliber 2,5 m | 1,35 PJ/Schuss</li>
-        <li>Schildprojektion: Extern über planetaren Schildemitter (auf Äquatorplatte)</li>
-        <li>Schildträgermond: Gebundene Rotation | gerichteter Schutzvektor</li>
-        <li>Steuerzentrale: Autonomes Droidenmodul, planetare Kontrolle</li>
-        <li>Verteidigung: 6 CIWS, 2 Interceptorpods, 1 Flakwerfer</li>
-        <li>Besatzung: 18 Wartungsdroideneinheiten</li>
+        <li><strong>Plattformkörper:</strong> Stabilisierte Orbitalstation mit Zentralträger und Energiekern</li>
+        <li><strong>Primärwaffe:</strong> MAB-EX-Ω | 12 Schuss/Min. | Kaliber 2,5 m | 1,35 PJ/Schuss</li>
+        <li><strong>Schildprojektion:</strong> Extern über planetaren Schildemitter (auf Äquatorplatte)</li>
+        <li><strong>Schildträgermond:</strong> Gebundene Rotation | gerichteter Schutzvektor</li>
+        <li><strong>Steuerzentrale:</strong> Autonomes Droidenmodul, planetare Kontrolle</li>
+        <li><strong>Verteidigung:</strong> 6 CIWS, 2 Interceptorpods, 1 Flakwerfer</li>
+        <li><strong>Besatzung:</strong> 18 Wartungsdroideneinheiten</li>
       </ul>
 
       <h2>3. Schildstrategie</h2>
       <p>
-        Der Schutz erfolgt durch Schildprojektion eines gebunden rotierenden Mondes.
-        Der Schildstrahl ist auf eine fixe Umlaufposition ausgerichtet.
+        Der Schutz erfolgt durch Schildprojektion eines gebunden rotierenden Mondes. Der Schildstrahl ist auf eine fixe Umlaufposition ausgerichtet.
       </p>
       <ul>
         <li><strong>Vorteile:</strong> Energieeinsparung, stabile Position, gute Testbedingungen</li>
         <li><strong>Einschränkungen:</strong> Keine Mobilität, Projektausfall bei Orbitabweichung</li>
         <li><strong>Schussmodus:</strong> Temporäre Schildöffnung zum Projektilaustritt</li>
+      </ul>
+
+      <h2>4. Bewertung der Prototypstrategie</h2>
+      <p>
+        Der Prototyp dient primär als technische Machbarkeitsstudie. Eine Verteidigung mit planetarer Schildprojektion ist nur bei idealen Umlaufverhältnissen praktikabel. Für strategische Einsätze ist ein späterer Umbau mit integriertem Schildemitter vorgesehen.
+      </p>
+
+      <h2>5. Langfristige Entwicklung</h2>
+      <ul>
+        <li>Einbau modularer Schildsysteme in die Plattform</li>
+        <li>Netzwerkfähige Koordination zwischen mehreren Plattformen</li>
+        <li>Integration orbitaler Sensor- und Kommunikationsrelais</li>
       </ul>
     </div>
   </div>
