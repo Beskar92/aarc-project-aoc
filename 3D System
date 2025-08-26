@@ -1,0 +1,399 @@
+# Fix marker symbols for 3D (limited set) and rebuild the HTML
+
+import numpy as np
+import plotly.graph_objects as go
+
+def orbit_pos(r, T_days, t_days, phi0_rad=0.0):
+    angle = phi0_rad + 2.0*np.pi * (t_days / T_days)
+    return r*np.cos(angle), r*np.sin(angle), 0.0
+
+def unit_xy(x, y):
+    n = np.hypot(x, y)
+    return (x/n, y/n) if n != 0 else (1.0, 0.0)
+
+def min_dist_sun_on_segment(A, B):
+    Ax, Ay, _ = A; Bx, By, _ = B
+    AB = np.array([Bx - Ax, By - Ay], dtype=float)
+    AO = np.array([-Ax, -Ay], dtype=float)
+    denom = AB.dot(AB)
+    if denom == 0:
+        return np.hypot(Ax, Ay)
+    t = np.clip(AB.dot(AO) / denom, 0.0, 1.0)
+    P = np.array([Ax, Ay]) + t * AB
+    return np.hypot(P[0], P[1])
+
+planets = {
+    "Merkur":  {"r": 0.39, "T":  87.969,  "phi0": np.deg2rad(10),  "color": "#9aa0a6"},
+    "Venus":   {"r": 0.72, "T": 224.701,  "phi0": np.deg2rad(70),  "color": "#ef6c00"},
+    "Erde":    {"r": 1.00, "T": 365.256,  "phi0": np.deg2rad(0),   "color": "#1e88e5"},
+    "Mars":    {"r": 1.52, "T": 686.980,  "phi0": np.deg2rad(200), "color": "#d32f2f"},
+    "Ceres":   {"r": 2.77, "T": 1680.0,   "phi0": np.deg2rad(140), "color": "#8bc34a"},
+    "Jupiter": {"r": 5.20, "T": 4332.589, "phi0": np.deg2rad(30),  "color": "#795548"},
+    "Saturn":  {"r": 9.58, "T": 10759.22, "phi0": np.deg2rad(300), "color": "#fbc02d"},
+}
+
+SBSP_R = 0.40
+SBSP_T = (SBSP_R ** 1.5) * 365.25
+sbsp_nodes_phase_deg = {"SBSP-Alpha": 0.0, "SBSP-Beta": 120.0, "SBSP-Gamma": 240.0}
+
+INNER_MAX = 2.0
+MIDDLE_MAX = 6.0
+OUTER_MAX  = 11.0
+
+node_catalog = {
+    "Erde-L1-Depot":     {"type": "hub",      "host": "Erde",    "offset": ("radial", -0.01)},
+    "Luna-City":         {"type": "colony",   "host": "Erde",    "offset": ("tangent_deg", 8.0, 1.02)},
+    "Luna-Shipyard":     {"type": "shipyard", "host": "Erde",    "offset": ("tangent_deg", -8.0, 1.03)},
+
+    "Areopolis-Colony":  {"type": "colony",   "host": "Mars",    "offset": ("radial",  0.04)},
+    "Mars-Hub":          {"type": "hub",      "host": "Mars",    "offset": ("radial",  0.06)},
+    "Deimos-Yard":       {"type": "shipyard", "host": "Mars",    "offset": ("tangent_deg", 12.0, 1.04)},
+
+    "Ceres-Hub":         {"type": "hub",      "host": "Ceres",   "offset": ("radial",  0.12)},
+    "Ceres-Mining":      {"type": "resource", "host": "Ceres",   "offset": ("tangent_deg", 25.0, 1.02)},
+    "Belt-Relay":        {"type": "hub",      "host": None,      "custom": "mid_between_Mars_Ceres"},
+
+    "Jupiter-L4":        {"type": "hub",      "host": "Jupiter", "offset": ("lagrange", +60.0)},
+    "Jupiter-L5":        {"type": "hub",      "host": "Jupiter", "offset": ("lagrange", -60.0)},
+    "Europa-BioLab":     {"type": "research", "host": "Jupiter", "offset": ("moon_orbit", 0.25, +20.0)},
+    "Ganymed-Research":  {"type": "research", "host": "Jupiter", "offset": ("moon_orbit", 0.30, -40.0)},
+
+    "Saturn-Titan-Hub":  {"type": "hub",      "host": "Saturn",  "offset": ("moon_orbit", 0.30, 10.0)},
+    "Titan-City":        {"type": "colony",   "host": "Saturn",  "offset": ("moon_orbit", 0.34, 70.0)},
+    "Titan-Fuel":        {"type": "resource", "host": "Saturn",  "offset": ("moon_orbit", 0.36, -30.0)},
+    "Enceladus-Water":   {"type": "resource", "host": "Saturn",  "offset": ("moon_orbit", 0.26, 140.0)},
+    "Saturn-Ring-Yard":  {"type": "shipyard", "host": "Saturn",  "offset": ("tangent_deg", -8.0, 1.04)},
+
+    "SBSP-Alpha":        {"type": "sbsp",     "host": "SBSP",    "phase_deg": 0.0},
+    "SBSP-Beta":         {"type": "sbsp",     "host": "SBSP",    "phase_deg": 120.0},
+    "SBSP-Gamma":        {"type": "sbsp",     "host": "SBSP",    "phase_deg": 240.0},
+}
+
+type_style = {
+    "hub":      {"color": "#ffffff", "symbol": "diamond",      "size": 5},
+    "colony":   {"color": "#29b6f6", "symbol": "circle",       "size": 5},
+    "shipyard": {"color": "#ab47bc", "symbol": "square",       "size": 5},
+    "resource": {"color": "#ff7043", "symbol": "diamond-open", "size": 6},
+    "research": {"color": "#ffee58", "symbol": "x",            "size": 6},
+    "sbsp":     {"color": "#ffb300", "symbol": "circle-open",  "size": 7},
+}
+
+def compute_nodes(t_days):
+    host_pos = {}
+    for name, p in planets.items():
+        host_pos[name] = orbit_pos(p["r"], p["T"], t_days, p["phi0"])
+    for n, phase in sbsp_nodes_phase_deg.items():
+        host_pos[n] = orbit_pos(SBSP_R, SBSP_T, t_days, np.deg2rad(phase))
+
+    nodes = {}
+    meta  = {}
+    host_phi = {name: np.arctan2(pos[1], pos[0]) for name, pos in host_pos.items()}
+    host_r   = {name: np.hypot(pos[0], pos[1]) for name, pos in host_pos.items()}
+
+    def place_by_offset(host_xy, host_r, host_phi, spec):
+        mode = spec[0]
+        if mode == "radial":
+            dr = spec[1]
+            ux, uy = unit_xy(*host_xy[:2])
+            return host_xy[0] + dr*ux, host_xy[1] + dr*uy, 0.0
+        elif mode == "tangent_deg":
+            ddeg = spec[1]; scale = spec[2] if len(spec)>2 else 1.02
+            phi = host_phi + np.deg2rad(ddeg); r = host_r * scale
+            return r*np.cos(phi), r*np.sin(phi), 0.0
+        elif mode == "lagrange":
+            ddeg = spec[1]; phi = host_phi + np.deg2rad(ddeg); r = host_r
+            return r*np.cos(phi), r*np.sin(phi), 0.0
+        elif mode == "moon_orbit":
+            r_m, ddeg = spec[1], spec[2]
+            phi = host_phi + np.deg2rad(ddeg)
+            cx, cy, cz = host_xy
+            return cx + r_m*np.cos(phi), cy + r_m*np.sin(phi), 0.0
+        else:
+            return host_xy
+
+    def belt_mid_point():
+        mx, my, _ = host_pos["Mars"]; cx, cy, _ = host_pos["Ceres"]
+        mphi = np.arctan2(my, mx); cphi = np.arctan2(cy, cx)
+        dphi = np.arctan2(np.sin(cphi - mphi), np.cos(cphi - mphi))
+        mid_phi = mphi + dphi/2.0
+        r = 2.20
+        return r*np.cos(mid_phi), r*np.sin(mid_phi), 0.0
+
+    for n, cfg in node_catalog.items():
+        ttype = cfg["type"]
+        meta[n] = {"type": ttype}
+        if cfg["host"] == "SBSP":
+            nodes[n] = host_pos[n]
+        elif cfg.get("custom") == "mid_between_Mars_Ceres":
+            nodes[n] = belt_mid_point()
+        else:
+            host = cfg["host"]
+            hx, hy, hz = host_pos[host]
+            phi = host_phi[host]; r = host_r[host]
+            if "offset" in cfg:
+                nodes[n] = place_by_offset((hx,hy,hz), r, phi, cfg["offset"])
+            else:
+                nodes[n] = (hx, hy, hz)
+
+    return nodes, meta
+
+SUN_NO_GO = 0.25
+
+def nearest_sbsp(nodes, P):
+    candidates = ["SBSP-Alpha", "SBSP-Beta", "SBSP-Gamma"]
+    px, py, _ = P
+    best = None; best_d2 = 1e9
+    for n in candidates:
+        x,y,z = nodes[n]
+        d2 = (x-px)**2 + (y-py)**2
+        if d2 < best_d2:
+            best_d2 = d2; best = n
+    return best
+
+def auto_edges(nodes, meta):
+    edges = []
+    backbone = [
+        ("SBSP-Alpha","Erde-L1-Depot"),
+        ("Erde-L1-Depot","Mars-Hub"),
+        ("Mars-Hub","Ceres-Hub"),
+        ("Ceres-Hub","Jupiter-L4"),
+        ("Jupiter-L4","Saturn-Titan-Hub"),
+        ("SBSP-Beta","Erde-L1-Depot"),
+        ("SBSP-Gamma","Erde-L1-Depot"),
+        ("Mars-Hub","Jupiter-L5"),
+        ("Jupiter-L5","Saturn-Titan-Hub"),
+        ("Erde-L1-Depot","Luna-Shipyard"),
+        ("Erde-L1-Depot","Luna-City"),
+        ("Mars-Hub","Deimos-Yard"),
+    ]
+    edges += backbone
+
+    hubs_inner = ["Erde-L1-Depot","Luna-Shipyard","Mars-Hub","SBSP-Alpha","SBSP-Beta","SBSP-Gamma"]
+    hubs_middle = ["Mars-Hub","Ceres-Hub","Belt-Relay"]
+    hubs_outer = ["Jupiter-L4","Jupiter-L5","Saturn-Titan-Hub"]
+
+    def zone_for_node(P):
+        r = np.hypot(P[0], P[1])
+        if r <= INNER_MAX: return "inner"
+        if r <= MIDDLE_MAX: return "middle"
+        return "outer"
+
+    for n, P in nodes.items():
+        if meta[n]["type"] in ("hub","sbsp"):
+            continue
+        zone = zone_for_node(P)
+        candidates = hubs_inner if zone=="inner" else (hubs_middle if zone=="middle" else hubs_outer)
+        dlist = []
+        for h in candidates:
+            Q = nodes[h]
+            dlist.append((np.hypot(P[0]-Q[0], P[1]-Q[1]), h))
+        dlist.sort(key=lambda x: x[0])
+        if dlist:
+            edges.append((n, dlist[0][1]))
+        if len(dlist) > 1:
+            edges.append((n, dlist[1][1]))
+
+    final_edges = []
+    for A,B in edges:
+        dmin = min_dist_sun_on_segment(nodes[A], nodes[B])
+        if dmin < SUN_NO_GO:
+            mid = ((nodes[A][0]+nodes[B][0])*0.5, (nodes[A][1]+nodes[B][1])*0.5, 0.0)
+            relay = nearest_sbsp(nodes, mid)
+            final_edges.append((A, relay)); final_edges.append((relay, B))
+        else:
+            final_edges.append((A,B))
+
+    dedup = set(); cleaned = []
+    for A,B in final_edges:
+        key = (A,B)
+        if key not in dedup:
+            dedup.add(key); cleaned.append((A,B))
+    return cleaned
+
+def edges_to_polyline(nodes, edges):
+    xs, ys, zs = [], [], []
+    for A,B in edges:
+        x0,y0,z0 = nodes[A]; x1,y1,z1 = nodes[B]
+        xs += [x0, x1, None]; ys += [y0, y1, None]; zs += [z0, z1, None]
+    return xs, ys, zs
+
+fig = go.Figure()
+
+fig.add_trace(go.Scatter3d(
+    x=[0], y=[0], z=[0], mode="markers+text",
+    marker=dict(size=8, color="yellow"),
+    text=["Sonne"], textposition="top center",
+    name="Sonne", hoverinfo="text"
+))
+
+theta = np.linspace(0, 2*np.pi, 361)
+fig.add_trace(go.Scatter3d(
+    x=SBSP_R*np.cos(theta), y=SBSP_R*np.sin(theta), z=np.zeros_like(theta),
+    mode="lines", line=dict(color="#ffb300", width=2, dash="dash"),
+    name="SBSP-Linie (0.4 AU)", hoverinfo="none"
+))
+
+for name, p in planets.items():
+    r = p["r"]
+    x = r*np.cos(theta); y = r*np.sin(theta); z = np.zeros_like(theta)
+    fig.add_trace(go.Scatter3d(
+        x=x, y=y, z=z, mode="lines",
+        line=dict(color=p["color"], width=2),
+        name=f"Orbit {name}", hoverinfo="none"
+    ))
+
+def add_zone_annulus(fig, r_inner, r_outer, color_rgba, name):
+    RMAX = r_outer
+    N = 180
+    xs = np.linspace(-RMAX, RMAX, N)
+    ys = np.linspace(-RMAX, RMAX, N)
+    X, Y = np.meshgrid(xs, ys)
+    R = np.sqrt(X**2 + Y**2)
+    Z = np.zeros_like(R)
+    mask = (R >= r_inner) & (R <= r_outer)
+    Z[~mask] = np.nan
+    fig.add_trace(go.Surface(
+        x=X, y=Y, z=Z,
+        showscale=False, opacity=0.10,
+        name=name, hoverinfo="skip",
+        surfacecolor=np.where(mask, 1.0, np.nan),
+        colorscale=[[0, color_rgba],[1, color_rgba]]
+    ))
+
+add_zone_annulus(fig, 0.0, INNER_MAX, "rgba(41, 182, 246, 0.20)", "Innenbereich (≤2 AU)")
+add_zone_annulus(fig, INNER_MAX, MIDDLE_MAX, "rgba(255, 112, 67, 0.18)", "Mittelbereich (2–6 AU)")
+add_zone_annulus(fig, MIDDLE_MAX, OUTER_MAX, "rgba(171, 71, 188, 0.15)", "Außenbereich (6–11 AU)")
+
+t0 = 0.0
+nodes0, meta0 = compute_nodes(t0)
+
+for name, p in planets.items():
+    x0, y0, z0 = orbit_pos(p["r"], p["T"], t0, p["phi0"])
+    fig.add_trace(go.Scatter3d(
+        x=[x0], y=[y0], z=[z0], mode="markers+text",
+        marker=dict(size=5, color=p["color"]),
+        text=[name], textposition="top center",
+        name=name,
+        hovertemplate=f"{name}<br>x: %{{x:.2f}} AU<br>y: %{{y:.2f}} AU<extra></extra>"
+    ))
+
+types = list(type_style.keys())
+type_to_names = {t: [] for t in types}
+for n, info in meta0.items():
+    type_to_names[info["type"]].append(n)
+
+node_type_traces_indices = []
+for t in types:
+    names = type_to_names[t]
+    xs, ys, zs, texts = [], [], [], []
+    for n in names:
+        x,y,z = nodes0[n]
+        xs.append(x); ys.append(y); zs.append(z); texts.append(n)
+    sty = type_style[t]
+    fig.add_trace(go.Scatter3d(
+        x=xs, y=ys, z=zs,
+        mode="markers+text",
+        marker=dict(size=sty["size"], color=sty["color"], symbol=sty["symbol"]),
+        text=names,
+        textposition="top center",
+        name=f"{t.capitalize()}",
+        hovertemplate="Node: %{text}<br>x: %{x:.2f} AU<br>y: %{y:.2f} AU<extra></extra>"
+    ))
+    node_type_traces_indices.append(len(fig.data)-1)
+
+edges0 = auto_edges(nodes0, meta0)
+xs0, ys0, zs0 = edges_to_polyline(nodes0, edges0)
+fig.add_trace(go.Scatter3d(
+    x=xs0, y=ys0, z=zs0,
+    mode="lines",
+    line=dict(color="#00e676", width=6),
+    name="Logistiknetz (dynamisch)"
+))
+network_trace_index = len(fig.data)-1
+
+years = 10
+steps = years * 12
+t_grid = np.linspace(0, years*365.25, steps)
+
+N_orbits = len(planets)
+N_zone_surfaces = 3
+planet_marker_start = 1 + 1 + N_orbits + N_zone_surfaces
+planet_marker_indices = list(range(planet_marker_start, planet_marker_start + len(planets)))
+node_trace_start = planet_marker_start + len(planets)
+node_trace_indices = list(range(node_trace_start, node_trace_start + len(types)))
+
+frames = []
+for t in t_grid:
+    nodes_t, meta_t = compute_nodes(t)
+
+    planet_datas = []
+    for name, p in planets.items():
+        x,y,z = orbit_pos(p["r"], p["T"], t, p["phi0"])
+        planet_datas.append(go.Scatter3d(x=[x], y=[y], z=[z]))
+
+    node_datas = []
+    for tp in types:
+        names = [n for n in nodes_t.keys() if meta_t[n]["type"] == tp]
+        xs, ys, zs = [], [], []
+        for n in names:
+            x,y,z = nodes_t[n]
+            xs.append(x); ys.append(y); zs.append(z)
+        node_datas.append(go.Scatter3d(x=xs, y=ys, z=zs))
+
+    edges_t = auto_edges(nodes_t, meta_t)
+    xs, ys, zs = edges_to_polyline(nodes_t, edges_t)
+    net_data = go.Scatter3d(x=xs, y=ys, z=zs)
+
+    frames.append(go.Frame(
+        data = planet_datas + node_datas + [net_data],
+        traces = planet_marker_indices + node_trace_indices + [network_trace_index],
+        name = f"t={t:.1f} d"
+    ))
+
+fig.frames = frames
+
+steps_slider = []
+for i, t in enumerate(t_grid):
+    steps_slider.append(dict(
+        method="animate",
+        args=[[f"t={t:.1f} d"],
+              {"mode":"immediate","frame":{"duration":0,"redraw":True},"transition":{"duration":0}}],
+        label=f"M{i+1}"
+    ))
+
+fig.update_layout(
+    title="Dynamisches Sol-System: Kolonien · Werften · Ressourcen · Forschung · Logistiknetz (auto-routend)",
+    template="plotly_dark",
+    legend=dict(orientation="h", yanchor="bottom", y=0.01, xanchor="center", x=0.5),
+    scene=dict(
+        xaxis=dict(title="X (AU)", backgroundcolor="rgba(0,0,0,0.05)"),
+        yaxis=dict(title="Y (AU)", backgroundcolor="rgba(0,0,0,0.05)"),
+        zaxis=dict(title="Z (AU)", range=[-1, 1], backgroundcolor="rgba(0,0,0,0.05)"),
+        aspectmode="data"
+    ),
+    margin=dict(l=0, r=0, b=0, t=60),
+    sliders=[{
+        "active": 0, "y": 0, "x": 0.1, "len": 0.8,
+        "pad": {"b": 10, "t": 30},
+        "currentvalue": {"prefix": "Zeit: ", "suffix": " (Tage)", "visible": True},
+        "steps": steps_slider
+    }],
+    updatemenus=[{
+        "type": "buttons", "direction": "left", "x": 0.1, "y": 0,
+        "pad": {"r": 10, "t": 30},
+        "buttons": [
+            {"label": "▶︎ Play", "method": "animate",
+             "args": [None, {"fromcurrent": True,
+                             "frame": {"duration": 120, "redraw": True},
+                             "transition": {"duration": 0}}]},
+            {"label": "⏸ Pause", "method": "animate",
+             "args": [[None], {"mode": "immediate",
+                               "frame": {"duration": 0, "redraw": False},
+                               "transition": {"duration": 0}}]}
+        ]
+    }]
+)
+
+out_path = "/mnt/data/Solar_Logistics_NETWORK_FULL.html"
+fig.write_html(out_path, include_plotlyjs="cdn", full_html=True)
+out_path
